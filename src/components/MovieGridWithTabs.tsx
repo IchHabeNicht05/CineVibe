@@ -23,9 +23,9 @@ const PROVIDER_SECTIONS = [
   { id: "apple", name: "Apple TV+", logo: "/logos/apple.jpg" },
 ];
 
-// NOVÉ: Mapování žánrů pro Filmy i TV seriály na jednom místě
+// OPRAVA 1: Sjednocení tvaru objektů. I "all" nyní obsahuje movie a tv (jako prázdný string)
 const GENRES = [
-  { id: "all", name: "Všechny žánry" },
+  { id: "all", name: "Všechny žánry", movie: "", tv: "" }, 
   { id: "action", name: "Akční & Dobrodružné", movie: "28,12", tv: "10759" },
   { id: "comedy", name: "Komedie", movie: "35", tv: "35" },
   { id: "romance", name: "Romantické", movie: "10749", tv: "18,10766" },
@@ -53,10 +53,8 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [randomItem, setRandomItem] = useState<Movie | null>(null);
   
-  // NOVÝ STAV PRO ŽÁNR
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
 
-  // Výchozí zobrazení platí pouze tehdy, pokud nemáme vybraný žádný specifický žánr
   const isDefaultView = activeTab === "popular" && mediaType === "movie" && region === "CZ" && selectedGenre === "all";
 
   useEffect(() => {
@@ -66,7 +64,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
     }
   }, []);
 
-  // Reset stránek při jakékoliv změně filtrů (včetně žánru)
   useEffect(() => {
     setPage(1);
     setFetchedItems([]);
@@ -81,7 +78,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
     const fetchSectionContent = async () => {
       setLoading(true);
       
-      // Zjistíme správné TMDB ID pro aktuální typ média (film/tv)
       const genreObj = GENRES.find((g) => g.id === selectedGenre);
       const genreIdParam = genreObj && genreObj.id !== "all" 
         ? (mediaType === "movie" ? genreObj.movie : genreObj.tv) 
@@ -124,7 +120,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
     setRandomItem(itemsToShow[randomIndex]);
   };
 
-  // VÝPOČET ZOBRAZOVANÝCH POLOŽEK
   const getSortedItems = () => {
     let baseItems: Movie[] = [];
 
@@ -133,11 +128,12 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
         mediaType === "movie" ? !!item.title : !!item.name
       );
 
-      // Klientské filtrování žánrů uvnitř Watchlistu!
       if (selectedGenre !== "all") {
         const genreObj = GENRES.find((g) => g.id === selectedGenre);
         if (genreObj) {
-          const activeGenreIds = (mediaType === "movie" ? genreObj.movie : genreObj.tv)
+          // OPRAVA 2: Fallback (|| ""), aby měl TypeScript absolutní jistotu, že je to String
+          const genreString = mediaType === "movie" ? genreObj.movie : genreObj.tv;
+          const activeGenreIds = (genreString || "")
             .split(",")
             .map(Number);
 
@@ -180,7 +176,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
   return (
     <div className="mx-auto max-w-7xl px-6 pt-12 pb-16">
       
-      {/* HLAVIČKA A TITULEK */}
       <div className="mb-8 flex flex-col gap-6 border-b border-slate-900 pb-6 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
         <div className="max-w-md">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl flex items-center gap-3">
@@ -244,7 +239,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
         </div>
       </div>
 
-      {/* NOVÝ ŽÁNROVÝ FILTR (Pill buttons s horizontálním scrollem na mobilu) */}
       <div className="mb-6 flex gap-2 overflow-x-auto pb-3 pt-1 scrollbar-none border-b border-slate-950">
         {GENRES.map((genre) => {
           const isActive = selectedGenre === genre.id;
@@ -264,7 +258,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
         })}
       </div>
 
-      {/* STRÁNKOVACÍ / ŘADÍCÍ LIŠTA + GENERÁTOR */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-400 bg-slate-900/20 border border-slate-900/60 p-3 rounded-xl backdrop-blur-sm">
         <div>
           Zobrazeno: <span className="font-bold text-slate-200">{itemsToShow?.length || 0}</span> {contentLabel} {activeTab !== "watchlist" && `(strana ${page})`}
@@ -297,7 +290,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
         </div>
       </div>
 
-      {/* MŘÍŽKA S OBSAHEM */}
       <div className="relative min-h-[400px]">
         {loading && page === 1 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 pt-20">
@@ -343,7 +335,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
         )}
       </div>
 
-      {/* ANIMOVANÝ MODAL PRO NÁHODNÝ VÝBĚR */}
       <AnimatePresence>
         {randomItem && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
