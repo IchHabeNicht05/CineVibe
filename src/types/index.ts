@@ -8,6 +8,10 @@ export interface Movie {
   vote_average: number;
   release_date: string;
   genre_ids?: number[];
+  
+  // 👇 PŘIDÁNO PRO SERIÁLY 👇
+  name?: string;
+  first_air_date?: string;
 }
 
 // Typ pro produkční společnosti v detailu filmu
@@ -33,4 +37,8 @@ export interface MovieDetail {
   revenue: number;
   status: string;
   production_companies: ProductionCompany[];
+  
+  // 👇 PŘIDÁNO PRO SERIÁLY (pro jistotu do budoucna) 👇
+  name?: string;
+  first_air_date?: string;
 }
