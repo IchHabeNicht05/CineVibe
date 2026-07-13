@@ -210,7 +210,9 @@ export default function Header() {
         {/* AKČNÍ TLAČÍTKA VPRAVO */}
         <div className="flex items-center gap-1 sm:gap-2 text-slate-300">
           <button 
-            onClick={toggleSearch} 
+            onClick={toggleSearch}
+            aria-label={isSearchOpen ? "Zavřít vyhledávání" : "Otevřít vyhledávání"}
+            name={isSearchOpen ? "Zavřít vyhledávání" : "Otevřít vyhledávání"} 
             className={`transition-all duration-300 p-2.5 rounded-full flex items-center justify-center 
               ${isSearchOpen ? 'text-white bg-slate-800 shadow-inner' : 'hover:text-white hover:bg-slate-800/50'}`}
           >
