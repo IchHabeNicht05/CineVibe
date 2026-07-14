@@ -3,19 +3,20 @@
 import { useState, useEffect } from "react";
 import { Loader2, Play, ChevronDown, Flame } from "lucide-react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import MovieCard from "@/components/MovieCard"; // Naše sjednocená karta!
 
-// Varianty pro postupné animování prvků v Hero Banneru
-const heroContainerVariants = {
+// Přidáno : Variants
+const heroContainerVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.15, delayChildren: 0.1 } as const,
+    transition: { staggerChildren: 0.15, delayChildren: 0.1 }
   }
 };
 
-const heroItemVariants = {
+// Přidáno : Variants
+const heroItemVariants: Variants = {
   hidden: { opacity: 0, y: 25 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 15 } }
 };
