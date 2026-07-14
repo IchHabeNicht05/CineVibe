@@ -3,10 +3,78 @@
 import { useState, useEffect } from "react";
 import { Movie } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { Heart, X, Sparkles, Film, ArrowRight, Lock, Loader2, LogOut, Plus, Copy, Check } from "lucide-react";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 
+// --- ROZHRANÍ PRO KARTU ---
+interface SwipeCardProps {
+  movie: Movie;
+  exitX: number;
+  onSwipe: (liked: boolean) => void;
+}
+
+// --- SAMOSTATNÁ KOMPONENTA KARTY S VLASTNÍ FYZIKOU ---
+function SwipeCard({ movie, exitX, onSwipe, ...props }: SwipeCardProps & any) {
+  // Každá karta má nyní své izolované Motion Values
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-15, 15]);
+
+  const handleDragEnd = (_event: any, info: any) => {
+    const swipeThreshold = 100; // Dráha v pixelech pro detekci swipu
+    if (info.offset.x > swipeThreshold) {
+      onSwipe(true);
+    } else if (info.offset.x < -swipeThreshold) {
+      onSwipe(false);
+    }
+  };
+
+  return (
+    <motion.div
+      {...props} // Klíčové: Předá interní animační stavy z AnimatePresence (pro plynulý exit)
+      style={{ x, rotate }}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }} // Vrací kartu na střed
+      dragElastic={0.7}
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }} // Rychlé, gumové vrácení zpět bez zasekávání
+      onDragEnd={handleDragEnd}
+      custom={exitX}
+      variants={{
+        enter: { scale: 0.95, opacity: 0 },
+        center: { scale: 1, opacity: 1 },
+        exit: (direction) => ({
+          x: direction,
+          opacity: 0,
+          scale: 0.9,
+          rotate: direction > 0 ? 15 : -15,
+          transition: { duration: 0.25 }
+        })
+      }}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      className="absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900 shadow-2xl cursor-grab active:cursor-grabbing select-none touch-none"
+    >
+      <img
+        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+        alt={movie.title}
+        className="h-full w-full object-cover pointer-events-none"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent pointer-events-none" />
+      
+      <div className="absolute bottom-0 w-full p-6 text-white pointer-events-none">
+        <span className="rounded-md bg-amber-500 px-2.5 py-1 text-xs font-bold text-slate-950 shadow-md">
+          ★ {movie.vote_average.toFixed(1)}
+        </span>
+        <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight drop-shadow-lg">
+          {movie.title}
+        </h2>
+      </div>
+    </motion.div>
+  );
+}
+
+// --- HLAVNÍ KOMPONENTA RELACE ---
 interface SwipeSessionProps {
   movies: Movie[];
 }
@@ -22,13 +90,16 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
   const [isJoined, setIsJoined] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Nové stavy pro validaci a asynchronní akce
+  // Stavy pro validaci a asynchronní akce
   const [roomError, setRoomError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Stavy pro swipování
+  // Stavy pro swipování a animace
   const [currentIndex, setCurrentIndex] = useState(0);
   const [matchedMovie, setMatchedMovie] = useState<Movie | null>(null);
+  
+  // Směr odletu karty: kladné číslo = doprava, záporné = doleva
+  const [exitX, setExitX] = useState(0);
 
   const currentMovie = movies[currentIndex];
 
@@ -80,7 +151,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     let newCode = "";
     let success = false;
 
-    // Zkusíme vygenerovat unikátní kód (pokusy pro případ extrémně vzácné kolize)
     while (attempts < 5 && !success) {
       newCode = generateRoomCode();
       const { error } = await supabase.from("rooms").insert([
@@ -114,7 +184,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     setActionLoading(true);
     setRoomError("");
 
-    // Dotaz do Supabase, zda místnost existuje
     const { data, error } = await supabase
       .from("rooms")
       .select("code")
@@ -127,7 +196,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
       return;
     }
 
-    // Pokud existuje, pustíme uživatele dál
     localStorage.setItem("cinevibe_room", formattedCode);
     window.dispatchEvent(new Event("cinevibe_session_changed")); 
     setRoom(formattedCode);
@@ -135,7 +203,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     setActionLoading(false);
   };
 
-  // Opuštění místnosti
   const handleLeave = () => {
     localStorage.removeItem("cinevibe_room");
     window.dispatchEvent(new Event("cinevibe_session_changed"));
@@ -163,6 +230,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     );
   };
 
+  // Zápis swipu a kontrolu shody
   const handleSwipe = async (liked: boolean) => {
     if (!currentMovie || !user) return;
 
@@ -201,6 +269,12 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     setCurrentIndex((prev) => prev + 1);
   };
 
+  // Sjednocená funkce pro nastavení směru animace odletu a provede swipe
+  const performSwipe = (liked: boolean) => {
+    setExitX(liked ? 350 : -350);
+    handleSwipe(liked);
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-slate-950">
@@ -226,7 +300,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     );
   }
 
-  // --- OBRAZOVKA 1: Výběr (S validací a animací chyb) ---
+  // --- OBRAZOVKA 1: Výběr místnosti ---
   if (!isJoined) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] w-full items-center justify-center p-6 bg-slate-950 text-white">
@@ -249,7 +323,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
             </div>
 
             <div className="space-y-6">
-              {/* Tlačítko pro vytvoření */}
               <button
                 type="button"
                 disabled={actionLoading}
@@ -270,7 +343,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
                 <div className="flex-grow border-t border-slate-800/80"></div>
               </div>
 
-              {/* Formulář pro připojení */}
               <form onSubmit={handleJoin} className="space-y-4">
                 <div className="relative">
                   <input
@@ -282,7 +354,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
                     value={roomInput}
                     onChange={(e) => {
                       setRoomInput(e.target.value.toUpperCase());
-                      setRoomError(""); // Reset chyby při psaní
+                      setRoomError("");
                     }}
                     className={`w-full rounded-xl bg-slate-950/80 border p-3.5 text-center text-base font-mono tracking-widest text-white placeholder-slate-600 focus:ring-2 focus:ring-red-500/15 focus:outline-none transition-all duration-300 ${
                       roomError ? "border-red-500/50 focus:border-red-500" : "border-slate-800 focus:border-red-500"
@@ -343,10 +415,11 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     );
   }
 
-  // --- OBRAZOVKA 3: Zobrazení karet ---
+  // --- OBRAZOVKA 3: Swipování karet ---
   return (
     <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col items-center justify-center p-6 bg-slate-950 text-white overflow-hidden">
       
+      {/* Horní info bar */}
       <div className="mb-8 flex flex-wrap items-center justify-center gap-3 rounded-2xl sm:rounded-full bg-slate-900/80 border border-slate-800/60 pl-5 pr-2.5 py-2 sm:py-1.5 text-xs text-slate-400 font-medium backdrop-blur-md max-w-full">
         <span className="tracking-wide">
           Místnost: <span className="text-white font-mono font-extrabold text-sm select-all">{room}</span>
@@ -381,45 +454,30 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
         </div>
       </div>
 
+      {/* Kontejner s kartami */}
       <div className="relative w-full max-w-[340px] aspect-[2/3] sm:max-w-[360px]">
-        <AnimatePresence mode="popLayout">
-          <motion.div
+        <AnimatePresence custom={exitX} mode="popLayout">
+          {/* Volání izolované komponenty SwipeCard */}
+          <SwipeCard
             key={currentMovie.id}
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ x: 200, opacity: 0, scale: 0.9, rotate: 10 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900 shadow-2xl select-none"
-          >
-            <img
-              src={`https://image.tmdb.org/t/p/w500${currentMovie.poster_path}`}
-              alt={currentMovie.title}
-              className="h-full w-full object-cover pointer-events-none"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-            
-            <div className="absolute bottom-0 w-full p-6 text-white">
-              <span className="rounded-md bg-amber-500 px-2.5 py-1 text-xs font-bold text-slate-950 shadow-md">
-                ★ {currentMovie.vote_average.toFixed(1)}
-              </span>
-              <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight drop-shadow-lg">
-                {currentMovie.title}
-              </h2>
-            </div>
-          </motion.div>
+            movie={currentMovie}
+            exitX={exitX}
+            onSwipe={performSwipe}
+          />
         </AnimatePresence>
       </div>
 
+      {/* Ovládací tlačítka dole */}
       <div className="mt-8 flex items-center gap-6 z-10">
         <button
-          onClick={() => handleSwipe(false)}
+          onClick={() => performSwipe(false)}
           aria-label="Nelíbí se mi"
           className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-800/80 bg-slate-900/80 text-slate-400 shadow-xl backdrop-blur-md transition-all duration-300 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-500 active:scale-90"
         >
           <X size={28} />
         </button>
         <button
-          onClick={() => handleSwipe(true)}
+          onClick={() => performSwipe(true)}
           aria-label="Líbí se mi"
           className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl shadow-emerald-600/20 transition-all duration-300 hover:bg-emerald-500 hover:shadow-emerald-500/30 active:scale-90"
         >
@@ -427,6 +485,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
         </button>
       </div>
 
+      {/* Modální okno při Shodě */}
       <AnimatePresence>
         {matchedMovie && (
           <motion.div

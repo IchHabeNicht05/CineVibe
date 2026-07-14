@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Film, Search, User, X, LogOut, Loader2, Flame, Menu, LogIn, Star, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -184,13 +185,20 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 relative">
         
         {/* LOGO */}
-        <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="group flex items-center gap-2 sm:gap-2.5 transition-all active:scale-95">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/20 group-hover:shadow-red-500/40 transition-shadow">
-            <Film size={18} className="text-white" />
-          </div>
-          <span className="text-lg sm:text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300">
-            CineVibe
-          </span>
+        <Link href="/" className="flex items-center gap-3 active:scale-95 transition-transform">
+        <div className="relative h-14 w-14 overflow-hidden rounded-xl border border-white/[0.08] shadow-lg shadow-red-500/10">
+            <Image
+            src="/icon.png"
+            alt="CineVibe Logo"
+            width={56}
+            height={56}
+            priority
+            className="object-cover"
+            />
+        </div>
+        <span className="text-xl font-black tracking-tight text-white">
+            Cine<span className="text-red-500">Vibe</span>
+        </span>
         </Link>
         
         {/* NAVIGACE (DESKTOP) */}
@@ -222,6 +230,8 @@ export default function Header() {
           <div className="relative">
             <button 
               onClick={toggleProfile} 
+                aria-label={isProfileOpen ? "Zavřít profil" : "Otevřít profil"}
+                name={isProfileOpen ? "Zavřít profil" : "Otevřít profil"}
               className={`transition-all duration-300 p-2.5 rounded-full relative flex items-center justify-center
                 ${isProfileOpen ? 'text-white bg-slate-800 shadow-inner' : 'hover:text-white hover:bg-slate-800/50'}
                 ${supabaseUser ? 'border border-red-500/30 bg-red-500/5 text-red-400' : ''}`}

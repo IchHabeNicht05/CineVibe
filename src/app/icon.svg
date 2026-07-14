@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Pozadí s jemným přechodem do černé -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+    
+    <!-- Luxusní červený přechod pro Play Button -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f87171" />
+      <stop offset="50%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#b91c1c" />
+    </linearGradient>
+
+    <!-- Neonový zářící filtr -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Zaoblená ikona (App Base) -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  
+  <!-- Velmi decentní vnější svítící ohraničení -->
+  <rect x="12" y="12" width="488" height="488" rx="116" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-opacity="0.15" />
+
+  <!-- Grafika ikony -->
+  <g>
+    <!-- Stín/Záře pod Play Buttonem -->
+    <path d="M170,140 L350,246 C362,253 362,267 350,274 L170,380 C158,387 145,379 145,366 L145,154 C145,141 158,133 170,140 Z" 
+          fill="#ef4444" opacity="0.15" filter="url(#glow)"/>
+
+    <!-- Hlavní Play Button (Cine) -->
+    <path d="M170,140 L350,246 C362,253 362,267 350,274 L170,380 C158,387 145,379 145,366 L145,154 C145,141 158,133 170,140 Z" 
+          fill="url(#accentGrad)" />
+
+    <!-- Černý výřez (vytváří mezeru pod pulsem pro 3D efekt) -->
+    <path d="M110,260 L190,260 L210,200 L230,320 L255,130 L285,390 L310,260 L400,260" 
+          fill="none" 
+          stroke="#020617" 
+          stroke-width="22" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+          
+    <!-- Svítící bílý puls (Vibe) -->
+    <path d="M110,260 L190,260 L210,200 L230,320 L255,130 L285,390 L310,260 L400,260" 
+          fill="none" 
+          stroke="#ffffff" 
+          stroke-width="10" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          filter="url(#glow)"/>
+  </g>
+</svg>
