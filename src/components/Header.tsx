@@ -13,7 +13,8 @@ import {
   LogIn, 
   Star, 
   ChevronRight, 
-  Crown 
+  Crown,
+  Tv
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -249,18 +250,37 @@ export default function Header() {
         </Link>
         
         {/* NAVIGACE (DESKTOP) */}
-        <nav className="hidden md:flex items-center gap-2 text-sm font-semibold text-slate-300">
+        <nav className="hidden md:flex items-center gap-1 text-sm font-semibold text-slate-300">
           <Link 
             href="/" 
-            className={`px-4 py-2 rounded-full transition-all ${
+            className={`px-3 py-2 rounded-full transition-all ${
               isActive("/") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
             }`}
           >
             Domů
           </Link>
+          
+          {/* NOVÉ PODSTRÁNKY */}
+          <Link 
+            href="/film" 
+            className={`px-3 py-2 rounded-full transition-all ${
+              isActive("/film") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            Filmy
+          </Link>
+          <Link 
+            href="/tv" 
+            className={`px-3 py-2 rounded-full transition-all ${
+              isActive("/tv") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            Seriály
+          </Link>
+
           <Link 
             href="/kolekce" 
-            className={`px-4 py-2 rounded-full transition-all ${
+            className={`px-3 py-2 rounded-full transition-all ${
               isActive("/kolekce") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
             }`}
           >
@@ -268,7 +288,7 @@ export default function Header() {
           </Link>
           <Link 
             href="/swipe" 
-            className={`group flex items-center gap-1.5 px-4 py-2 rounded-full transition-all ${
+            className={`group flex items-center gap-1.5 px-3.5 py-2 rounded-full transition-all ${
               isActive("/swipe") ? "text-red-400 bg-red-500/10" : "text-red-400 hover:text-red-300 hover:bg-red-500/10"
             }`}
           >
@@ -276,10 +296,10 @@ export default function Header() {
             Match
           </Link>
 
-          {/* PREMIUM SEKCE (Zlatá korunka a PRO pill)
+          {/* PREMIUM SEKCE
           <Link
             href="/premium"
-            className={`group flex items-center gap-1.5 px-4 py-2 rounded-full transition-all ${
+            className={`group flex items-center gap-1.5 px-3.5 py-2 rounded-full transition-all ${
               isActive("/premium") 
                 ? "text-amber-400 bg-amber-500/10" 
                 : "text-slate-300 hover:text-amber-400 hover:bg-amber-500/5"
@@ -587,6 +607,17 @@ export default function Header() {
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
                 Domů
               </Link>
+              
+              {/* MOBILNÍ ODKAZY NA NOVÉ STRÁNKY */}
+              <Link href="/film" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+                <Film size={18} className="text-slate-400" />
+                Filmy
+              </Link>
+              <Link href="/tv" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+                <Tv size={18} className="text-slate-400" />
+                Seriály
+              </Link>
+
               <Link href="/kolekce" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
                 Kolekce
               </Link>

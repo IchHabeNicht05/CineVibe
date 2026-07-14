@@ -1,92 +1,124 @@
-// src/components/MovieCard.tsx
+"use client";
+
+import { Movie } from "@/types";
+import { Star, Flame, Bookmark } from "lucide-react";
 import Link from "next/link";
-import { Movie } from "@/types"; 
-import { Star, Calendar, Bookmark } from "lucide-react"; // PŘIDÁN BOOKMARK
+import { motion } from "framer-motion";
 
 interface MovieCardProps {
-  movie: Movie; // OPRAVENO: Používáme tvůj TypeScript typ místo 'any'
-  mediaType?: "movie" | "tv"; 
-  isWatchlisted?: boolean;       // NOVÉ
-  onToggleWatchlist?: () => void; // NOVÉ
+  movie: Movie;
+  mediaType: "movie" | "tv";
+  isWatchlisted: boolean;
+  onToggleWatchlist?: () => void;
 }
 
-export default function MovieCard({ 
-  movie, 
-  mediaType = "movie", 
-  isWatchlisted = false, 
-  onToggleWatchlist 
+export default function MovieCard({
+  movie,
+  mediaType,
+  isWatchlisted,
+  onToggleWatchlist,
 }: MovieCardProps) {
-  
-  const title = movie.title || movie.name;
-  
-  const localizedType = mediaType === "movie" ? "film" : "tv";
-  const linkHref = `/${localizedType}/${movie.id}`;
-  
+  // TMDB vrací pro filmy "title" a "release_date", ale pro seriály "name" a "first_air_date"
+  const title = movie.title || movie.name || "Bez názvu";
   const releaseDate = movie.release_date || movie.first_air_date;
-  const year = releaseDate ? releaseDate.substring(0, 4) : "";
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : "—";
+  
+  // URL adresa detailu (podpora pro film i tv)
+  const detailUrl = mediaType === "tv" ? `/tv/${movie.id}` : `/film/${movie.id}`;
+
+  const handleBookmarkClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Zabrání prokliknutí na detail při kliknutí na záložku
+    if (onToggleWatchlist) {
+      onToggleWatchlist();
+    }
+  };
 
   return (
-    <Link href={linkHref} className="group relative flex flex-col gap-2">
-      {/* OBRÁZEK PLAKÁTU */}
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-slate-800 shadow-md transition-all duration-300 group-hover:shadow-red-500/20">
-        
-        {/* NOVÉ: TLAČÍTKO PRO WATCHLIST (ZÁLOŽKA) */}
-        {onToggleWatchlist && (
-          <button
-            type="button"
-            aria-label={isWatchlisted ? "Odebrat z výběru" : "Uložit do výběru"}
-            onClick={(e) => {
-              e.preventDefault();  // Zamezí chování odkazu <Link>
-              e.stopPropagation(); // Zamezí šíření kliknutí do rodičovských prvků
-              onToggleWatchlist();
-            }}
-            className="absolute top-2.5 right-2.5 z-30 p-2 rounded-xl bg-slate-950/60 hover:bg-slate-950/90 border border-slate-800/50 backdrop-blur-md text-white transition-all active:scale-90 shadow-md"
-          >
-            <Bookmark 
-              size={15} 
-              className={isWatchlisted ? "fill-red-500 text-red-500" : "text-slate-300 group-hover/btn:text-white"} 
-            />
-          </button>
-        )}
-
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.28, ease: "easeOut" }}
+      className="group flex h-full flex-col relative overflow-hidden rounded-2xl border border-slate-900/80 bg-[#0b1120]/60 backdrop-blur-sm transition-all duration-300 hover:border-red-500/30 hover:shadow-xl hover:shadow-red-500/5"
+    >
+      {/* PLAKÁT S BADGES */}
+      <div className="relative aspect-[2/3] w-full overflow-hidden block">
         {movie.poster_path ? (
           <img
             src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-slate-500">
-            Bez obrázku
+          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-xs font-semibold text-slate-500">
+            Chybí plakát
           </div>
         )}
-        
-        {/* Ztmavení při najetí */}
-        <div className="absolute inset-0 bg-slate-950/0 transition-colors duration-300 group-hover:bg-slate-950/40" />
+
+        {/* Gradient přes plakát pro lepší čitelnost horních prvků */}
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+
+        {/* Hodnocení (Vlevo nahoře) */}
+        {movie.vote_average !== undefined && movie.vote_average > 0 && (
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-slate-800/80 bg-slate-950/80 px-2.5 py-1 text-[10px] font-black text-amber-400 shadow-lg backdrop-blur-md">
+            <Star size={10} fill="currentColor" className="stroke-amber-400" />
+            {movie.vote_average.toFixed(1)}
+          </div>
+        )}
+
+        {/* Záložka / Watchlist (Vpravo nahoře) */}
+        {onToggleWatchlist && (
+          <button
+            onClick={handleBookmarkClick}
+            className={`absolute top-3 right-3 z-10 p-2 rounded-lg border backdrop-blur-md shadow-lg transition-all duration-200 active:scale-90 cursor-pointer
+              ${
+                isWatchlisted
+                  ? "bg-red-600/90 border-red-500 text-white"
+                  : "bg-slate-950/80 border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700"
+              }`}
+            title={isWatchlisted ? "Odebrat z výběru" : "Uložit do mého výběru"}
+          >
+            <Bookmark size={13} fill={isWatchlisted ? "currentColor" : "none"} />
+          </button>
+        )}
       </div>
 
-      {/* INFORMACE POD PLAKÁTEM */}
-      <div className="mt-1 flex flex-col gap-1">
-        <h3 className="line-clamp-1 text-sm font-bold text-white transition-colors group-hover:text-red-500 sm:text-base">
-          {title}
-        </h3>
-        
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          {year && (
-            <span className="flex items-center gap-1">
-              <Calendar size={12} className="text-slate-500" />
-              {year}
-            </span>
-          )}
-          {movie.vote_average > 0 && (
-            <span className="flex items-center gap-1 font-medium text-amber-400">
-              <Star size={12} className="fill-amber-400" />
-              {movie.vote_average.toFixed(1)}
-            </span>
-          )}
+      {/* TEXTOVÝ OBSAH */}
+      <div className="flex flex-grow flex-col p-3.5">
+        {/* Rok vydání */}
+        <span className="mb-1 text-[10px] font-bold tracking-wider text-slate-500">
+          {year}
+        </span>
+
+        {/* Název titulu */}
+        <Link href={detailUrl} className="focus:outline-none">
+          <h3 className="line-clamp-1 text-xs sm:text-sm font-bold text-slate-200 transition-colors duration-250 group-hover:text-white">
+            {title}
+          </h3>
+        </Link>
+
+        {/* PATIČKA KARTY (Interaktivní akce) */}
+        <div className="mt-4 pt-3 border-t border-slate-900/60 flex items-center justify-between">
+          {/* Tinder Swipe Link */}
+          <Link
+            href="/swipe"
+            className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-400 transition-colors"
+          >
+            <Flame size={12} className="animate-pulse text-red-500" fill="currentColor" />
+            Swipe
+          </Link>
+
+          {/* Více Info Link */}
+          <Link
+            href={detailUrl}
+            className="text-[10px] font-bold text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Více info
+          </Link>
         </div>
       </div>
-    </Link>
+    </motion.div>
   );
 }
