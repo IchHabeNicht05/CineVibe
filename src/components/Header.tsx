@@ -1,16 +1,29 @@
-// src/components/Header.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Film, Search, User, X, LogOut, Loader2, Flame, Menu, LogIn, Star, ChevronRight } from "lucide-react";
+import { 
+  Film, 
+  Search, 
+  User, 
+  X, 
+  LogOut, 
+  Loader2, 
+  Flame, 
+  Menu, 
+  LogIn, 
+  Star, 
+  ChevronRight, 
+  Crown 
+} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Stavy pro UI panely
@@ -23,18 +36,26 @@ export default function Header() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   
-  // Index aktivní položky při navigaci šipkami (včetně řádku Zobrazit vše)
+  // Index aktivní položky při navigaci šipkami
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
   // Stavy pro Match místnosti
   const [activeUser, setActiveUser] = useState<string | null>(null);
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
 
-  // Aktuálně přihlášený uživatel ze Supabase
+  // Přihlášený uživatel a jeho Premium status ze Supabase
   const [supabaseUser, setSupabaseUser] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState(false);
 
-  // Načtení relací při montování komponenty
+  // Pomocná funkce pro zjištění, zda je odkaz aktivní
+  const isActive = (path: string) => pathname === path;
+
+  // Skládaná přezdívka pro zobrazení (přezdívka z místnosti -> email ze Supabase -> anonym)
+  const displayUser = activeUser || supabaseUser?.email?.split("@")[0] || "Uživatel";
+
+  // Načtení relací, sledování změn a ověření Premium profilu při startu
   useEffect(() => {
+    // 1. Kontrola aktivní místnosti v localStorage
     const checkRoomSession = () => {
       setActiveUser(localStorage.getItem("cinevibe_user"));
       setActiveRoom(localStorage.getItem("cinevibe_room"));
@@ -44,12 +65,42 @@ export default function Header() {
     window.addEventListener("storage", checkRoomSession);
     window.addEventListener("cinevibe_session_changed", checkRoomSession);
 
+    // Funkce pro bezpečné vytažení Premium statusu z DB
+    const fetchPremiumStatus = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("is_premium")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (data) {
+          setIsPremium(!!data.is_premium);
+        } else {
+          setIsPremium(false);
+        }
+      } catch (err) {
+        console.error("Chyba při načítání premium statusu:", err);
+        setIsPremium(false);
+      }
+    };
+
+    // 2. Kontrola přihlášení při prvním načtení
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSupabaseUser(session?.user || null);
+      const user = session?.user || null;
+      setSupabaseUser(user);
+      if (user) fetchPremiumStatus(user.id);
     });
 
+    // 3. Sledování změn stavu přihlášení (onAuthStateChange)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSupabaseUser(session?.user || null);
+      const user = session?.user || null;
+      setSupabaseUser(user);
+      if (user) {
+        fetchPremiumStatus(user.id);
+      } else {
+        setIsPremium(false);
+      }
     });
 
     return () => {
@@ -59,7 +110,7 @@ export default function Header() {
     };
   }, []);
 
-  // Autofokus na vyhledávací input a reset indexu
+  // Autofokus na vyhledávací input
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -67,7 +118,7 @@ export default function Header() {
     setFocusedIndex(-1);
   }, [isSearchOpen]);
 
-  // Logika pro TMDB našeptávač (Debounce 300ms)
+  // Vyhledávací našeptávač (Debounce 300ms)
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (query.trim().length < 2) {
@@ -81,7 +132,7 @@ export default function Header() {
         if (res.ok) {
           const data = await res.json();
           setSuggestions(data.results.slice(0, 5));
-          setFocusedIndex(-1); // Reset indexu při nových výsledcích
+          setFocusedIndex(-1);
         }
       } catch (err) {
         console.error("Chyba při načítání našeptávače:", err);
@@ -97,7 +148,6 @@ export default function Header() {
     return () => clearTimeout(delayDebounceFn);
   }, [query]);
 
-  // Pomocná funkce pro spuštění plnohodnotného vyhledávání (Zobrazit vše)
   const performFullSearch = () => {
     if (query.trim()) {
       router.push(`/search?q=${encodeURIComponent(query.trim())}`);
@@ -107,7 +157,6 @@ export default function Header() {
     }
   };
 
-  // OPRAVENÁ LOGIKA: Správné české routování na /film/ namísto /movie/
   const handleSuggestionClick = (id: number, type: string) => {
     router.push(`/${type === 'tv' ? 'tv' : 'film'}/${id}`);
     setIsSearchOpen(false);
@@ -115,11 +164,9 @@ export default function Header() {
     setSuggestions([]);
   };
 
-  // UPRAVENO: Ovládání klávesnice (počítá s +1 položkou pro "Zobrazit vše")
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (suggestions.length === 0) return;
-
-    const maxIndex = suggestions.length; // suggestions + "Zobrazit vše" řádek
+    const maxIndex = suggestions.length;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -186,52 +233,94 @@ export default function Header() {
         
         {/* LOGO */}
         <Link href="/" className="flex items-center gap-3 active:scale-95 transition-transform">
-        <div className="relative h-14 w-14 overflow-hidden rounded-xl border border-white/[0.08] shadow-lg shadow-red-500/10">
+          <div className="relative h-14 w-14 overflow-hidden rounded-xl border border-white/[0.08] shadow-lg shadow-red-500/10">
             <Image
-            src="/icon.png"
-            alt="CineVibe Logo"
-            width={56}
-            height={56}
-            priority
-            className="object-cover"
+              src="/icon.png"
+              alt="CineVibe Logo"
+              width={56}
+              height={56}
+              priority
+              className="object-cover"
             />
-        </div>
-        <span className="text-xl font-black tracking-tight text-white">
+          </div>
+          <span className="text-xl font-black tracking-tight text-white">
             Cine<span className="text-red-500">Vibe</span>
-        </span>
+          </span>
         </Link>
         
         {/* NAVIGACE (DESKTOP) */}
         <nav className="hidden md:flex items-center gap-2 text-sm font-semibold text-slate-300">
-          <Link href="/" className="px-4 py-2 rounded-full hover:text-white hover:bg-slate-800/50 transition-all">
+          <Link 
+            href="/" 
+            className={`px-4 py-2 rounded-full transition-all ${
+              isActive("/") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
             Domů
           </Link>
-          <Link href="/kolekce" className="px-4 py-2 rounded-full hover:text-white hover:bg-slate-800/50 transition-all">
+          <Link 
+            href="/kolekce" 
+            className={`px-4 py-2 rounded-full transition-all ${
+              isActive("/kolekce") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
             Kolekce
           </Link>
-          <Link href="/swipe" className="group flex items-center gap-1.5 px-4 py-2 rounded-full text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all">
+          <Link 
+            href="/swipe" 
+            className={`group flex items-center gap-1.5 px-4 py-2 rounded-full transition-all ${
+              isActive("/swipe") ? "text-red-400 bg-red-500/10" : "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            }`}
+          >
             <Flame size={16} className="group-hover:animate-pulse" />
             Match
           </Link>
+
+          {/* PREMIUM SEKCE (Zlatá korunka a PRO pill)
+          <Link
+            href="/premium"
+            className={`group flex items-center gap-1.5 px-4 py-2 rounded-full transition-all ${
+              isActive("/premium") 
+                ? "text-amber-400 bg-amber-500/10" 
+                : "text-slate-300 hover:text-amber-400 hover:bg-amber-500/5"
+            }`}
+          >
+            <Crown 
+              size={16} 
+              className={`transition-all duration-300 ${
+                isPremium 
+                  ? "text-amber-400 fill-amber-400/20 animate-pulse" 
+                  : "text-slate-400 group-hover:text-amber-400"
+              }`} 
+            />
+            <span>Vibe Stats</span>
+            {!isPremium && (
+              <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20">
+                PRO
+              </span>
+            )}
+          </Link>
+          */}
         </nav>
 
         {/* AKČNÍ TLAČÍTKA VPRAVO */}
         <div className="flex items-center gap-1 sm:gap-2 text-slate-300">
+          
+          {/* Hledání */}
           <button 
             onClick={toggleSearch}
-            aria-label={isSearchOpen ? "Zavřít vyhledávání" : "Otevřít vyhledávání"}
-            name={isSearchOpen ? "Zavřít vyhledávání" : "Otevřít vyhledávání"} 
+            aria-label="Vyhledávání"
             className={`transition-all duration-300 p-2.5 rounded-full flex items-center justify-center 
               ${isSearchOpen ? 'text-white bg-slate-800 shadow-inner' : 'hover:text-white hover:bg-slate-800/50'}`}
           >
             {isSearchOpen ? <X size={18} /> : <Search size={18} />}
           </button>
 
+          {/* Profil a stav místnosti */}
           <div className="relative">
             <button 
               onClick={toggleProfile} 
-                aria-label={isProfileOpen ? "Zavřít profil" : "Otevřít profil"}
-                name={isProfileOpen ? "Zavřít profil" : "Otevřít profil"}
+              aria-label="Profil a místnost"
               className={`transition-all duration-300 p-2.5 rounded-full relative flex items-center justify-center
                 ${isProfileOpen ? 'text-white bg-slate-800 shadow-inner' : 'hover:text-white hover:bg-slate-800/50'}
                 ${supabaseUser ? 'border border-red-500/30 bg-red-500/5 text-red-400' : ''}`}
@@ -254,9 +343,16 @@ export default function Header() {
                   <div className="border-b border-slate-800 pb-3">
                     {supabaseUser ? (
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Přihlášený účet</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Přihlášený účet</span>
+                          </div>
+                          {isPremium && (
+                            <span className="flex items-center gap-1 text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              <Crown size={10} className="fill-amber-400" /> PREMIUM
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm font-bold text-slate-200 truncate">{supabaseUser.email}</p>
                         <button
@@ -282,7 +378,7 @@ export default function Header() {
                   </div>
 
                   <div>
-                    {activeRoom && activeUser ? (
+                    {activeRoom ? (
                       <div>
                         <div className="flex items-center gap-2 mb-3">
                           <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -291,7 +387,7 @@ export default function Header() {
                         <div className="space-y-2.5 rounded-xl bg-slate-950/50 p-3 border border-slate-800/80 mb-3 text-xs">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500 font-medium">Přezdívka</span>
-                            <span className="font-bold text-white">{activeUser}</span>
+                            <span className="font-bold text-white">{displayUser}</span>
                           </div>
                           <div className="h-px w-full bg-slate-800/60" />
                           <div className="flex items-center justify-between">
@@ -328,8 +424,10 @@ export default function Header() {
             </AnimatePresence>
           </div>
 
+          {/* Hamburger (mobil) */}
           <button 
             onClick={toggleMobileMenu}
+            aria-label="Menu"
             className="md:hidden p-2.5 rounded-full text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all"
           >
             {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -446,7 +544,6 @@ export default function Header() {
                       );
                     })}
 
-                    {/* NOVINKA: Dynamické tlačítko Zobrazit vše na konci seznamu */}
                     {suggestions.length > 0 && (
                       <button
                         onClick={performFullSearch}
@@ -497,6 +594,24 @@ export default function Header() {
                 <Flame size={18} className="animate-pulse" />
                 Match (Swipe)
               </Link>
+
+              {/* Premium v mobilním zobrazení
+              <Link 
+                href="/premium" 
+                onClick={() => setIsMobileMenuOpen(false)} 
+                className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-amber-500/10 text-slate-300 hover:text-amber-400 transition-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Crown size={18} className={isPremium ? "text-amber-400 fill-amber-400/10 animate-pulse" : "text-slate-400"} />
+                  <span>Vibe Stats</span>
+                </div>
+                {!isPremium && (
+                  <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+                    PRO
+                  </span>
+                )}
+              </Link>
+              */}
               
               <div className="h-px bg-slate-800/60 my-2" />
               

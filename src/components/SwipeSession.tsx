@@ -244,6 +244,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
         movie_title: currentMovie.title,
         movie_poster: currentMovie.poster_path,
         is_liked: liked,
+        genre_ids: currentMovie.genre_ids, // <--- TENTO ŘÁDEK JSME PŘIDALI
       },
     ]);
 
