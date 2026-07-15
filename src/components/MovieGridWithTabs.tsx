@@ -24,7 +24,6 @@ const PROVIDER_SECTIONS = [
   { id: "apple", name: "Apple TV+", logo: "/logos/apple.jpg" },
 ];
 
-// OPRAVA 1: Sjednocení tvaru objektů. I "all" nyní obsahuje movie a tv (jako prázdný string)
 const GENRES = [
   { id: "all", name: "Všechny žánry", movie: "", tv: "" }, 
   { id: "action", name: "Akční & Dobrodružné", movie: "28,12", tv: "10759" },
@@ -50,13 +49,14 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
   const [fetchedItems, setFetchedItems] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [region, setRegion] = useState<"CZ" | "US">("CZ");
+  // Region je nyní interní konstanta napevno nastavená na CZ
+  const region = "CZ";
   const [watchlist, setWatchlist] = useState<Movie[]>([]);
   const [randomItem, setRandomItem] = useState<Movie | null>(null);
   
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
 
-  const isDefaultView = activeTab === "popular" && mediaType === "movie" && region === "CZ" && selectedGenre === "all";
+  const isDefaultView = activeTab === "popular" && mediaType === "movie" && selectedGenre === "all";
 
   useEffect(() => {
     const saved = localStorage.getItem("cinevibe_watchlist");
@@ -69,7 +69,7 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
     setPage(1);
     setFetchedItems([]);
     setSortBy("default");
-  }, [activeTab, mediaType, region, selectedGenre]);
+  }, [activeTab, mediaType, selectedGenre]);
 
   useEffect(() => {
     if ((isDefaultView && page === 1) || activeTab === "watchlist") {
@@ -104,7 +104,7 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
     };
 
     fetchSectionContent();
-  }, [activeTab, mediaType, page, region, selectedGenre, isDefaultView]);
+  }, [activeTab, mediaType, page, selectedGenre, isDefaultView]);
 
   const handleToggleWatchlist = (movie: Movie) => {
     setWatchlist((prev) => {
@@ -166,8 +166,8 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
   const getDescription = () => {
     if (activeTab === "watchlist") return `Tvoje osobní sbírka. Máš zde rozkoukané nebo uložené ${contentLabel}.`;
     switch (activeTab) {
-      case "popular": return `Nejpopularnější ${contentLabel} tohoto týdne v regionu ${region}.`;
-      case "now_playing": return isMovie ? "Čerstvé novinky v kinech." : "Nové epizody a seriály v vysílání.";
+      case "popular": return `Nejpopulárnější ${contentLabel} tohoto týdne.`;
+      case "now_playing": return isMovie ? "Čerstvé novinky v kinech." : "Nové epizody a seriály ve vysílání.";
       case "top_rated": return `Klenoty s nejvyšším hodnocením.`;
       default: return `Objevuj ${contentLabel} na platformě ${currentInfo?.name}.`;
     }
@@ -191,13 +191,7 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
 
         <div className="flex flex-col gap-4 items-start lg:items-end">
           <div className="flex items-center gap-4">
-            {activeTab !== "watchlist" && (
-              <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs font-bold shadow-inner">
-                <button onClick={() => setRegion("CZ")} className={`px-3 py-1.5 rounded-lg transition-all ${region === "CZ" ? "bg-slate-800 text-white shadow" : "text-slate-500 hover:text-slate-300"}`}>🇨🇿 CZ</button>
-                <button onClick={() => setRegion("US")} className={`px-3 py-1.5 rounded-lg transition-all ${region === "US" ? "bg-slate-800 text-white shadow" : "text-slate-500 hover:text-slate-300"}`}>🇺🇸 US</button>
-              </div>
-            )}
-
+            {/* Region selektor byl kompletně odstraněn */}
             <div className="flex rounded-xl bg-slate-900/80 p-1 border border-slate-700/80 shadow-lg">
               <button onClick={() => setMediaType("movie")} className={`relative flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-bold uppercase tracking-wider transition-colors duration-200 ${isMovie ? "text-white" : "text-slate-400 hover:text-white"}`}>
                 {isMovie && <motion.div layoutId="mediaTypeIndicator" className="absolute inset-0 rounded-lg bg-red-600 shadow-md" transition={{ type: "spring", stiffness: 300, damping: 25 }} />}
@@ -341,9 +335,17 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="relative max-w-sm w-full bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center flex flex-col items-center">
               <button onClick={() => setRandomItem(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"><X size={20} /></button>
               <div className="mb-2 bg-red-500/10 text-red-500 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full animate-bounce">🍿 Dneska koukáš na toto!</div>
-              <div className="w-full my-4 text-left pointer-events-none">
-                <MovieCard movie={randomItem} mediaType={mediaType} isWatchlisted={watchlist.some(w => w.id === randomItem.id)} />
+              
+              {/* TADY: Odstraněno pointer-events-none a přidán onToggleWatchlist pro plnou interaktivitu */}
+              <div className="w-full my-4 text-left">
+                <MovieCard 
+                  movie={randomItem} 
+                  mediaType={mediaType} 
+                  isWatchlisted={watchlist.some(w => w.id === randomItem.id)} 
+                  onToggleWatchlist={() => handleToggleWatchlist(randomItem)}
+                />
               </div>
+              
               <button onClick={handlePickRandom} className="mt-2 flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-500 font-bold py-3 px-4 rounded-xl text-white transition-colors shadow-lg shadow-red-600/20">
                 <Dices size={16} />To se mi nelíbí, zkus jiný
               </button>
