@@ -3,7 +3,7 @@
 import { notFound } from "next/navigation";
 import { Star, Calendar, MonitorPlay, Users, Play, Info, Tv, Globe, Building2 } from "lucide-react";
 // Importujeme existující animační wrappery z detailu filmu
-import { AnimateFadeIn, StaggerContainer, StaggerItem } from "../../film/[id]/AnimationWrappers";
+import { AnimateFadeIn, StaggerContainer, StaggerItem } from "../../filmy/[id]/AnimationWrappers";
 import Discussion from "@/components/Discussion";
 
 async function getTvShowDetails(id: string) {

@@ -265,17 +265,17 @@ export default function Header() {
           
           {/* NOVÉ PODSTRÁNKY */}
           <Link 
-            href="/film" 
+            href="/filmy" 
             className={`px-3 py-2 rounded-full transition-all ${
-              isActive("/film") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+              isActive("/filmy") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
             }`}
           >
             Filmy
           </Link>
           <Link 
-            href="/tv" 
+            href="/serialy" 
             className={`px-3 py-2 rounded-full transition-all ${
-              isActive("/tv") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
+              isActive("/serialy") ? "text-white bg-slate-800/40" : "hover:text-white hover:bg-slate-800/50"
             }`}
           >
             Seriály

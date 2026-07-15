@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 
 interface MovieCardProps {
   movie: Movie;
-  mediaType: "movie" | "tv";
+  // Povolíme "tv" i "serialy", aby kód nespadl při použití nativních TMDB dat
+  mediaType: "movie" | "tv" | "serialy";
   isWatchlisted: boolean;
   onToggleWatchlist?: () => void;
 }
@@ -23,8 +24,11 @@ export default function MovieCard({
   const releaseDate = movie.release_date || movie.first_air_date;
   const year = releaseDate ? new Date(releaseDate).getFullYear() : "—";
   
-  // URL adresa detailu (podpora pro film i tv)
-  const detailUrl = mediaType === "tv" ? `/tv/${movie.id}` : `/film/${movie.id}`;
+  // Zjistíme, zda jde o seriál (akceptujeme jak "tv" z API, tak "serialy" z naší aplikace)
+  const isSerial = mediaType === "serialy" || mediaType === "tv";
+
+  // URL adresa detailu - nyní perfektně počeštěná!
+  const detailUrl = isSerial ? `/serialy/${movie.id}` : `/filmy/${movie.id}`;
 
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.preventDefault(); // Zabrání prokliknutí na detail při kliknutí na záložku
