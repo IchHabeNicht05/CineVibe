@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/tv/[id]/page.tsx
 import { notFound } from "next/navigation";
 import { Star, Calendar, MonitorPlay, Users, Play, Info, Tv, Globe, Building2 } from "lucide-react";

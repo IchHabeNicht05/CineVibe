@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/film/[id]/page.tsx
 import { notFound } from "next/navigation";
 import { Star, Calendar, Clock, Users, Play, Info, Building2, Wallet, Banknote, Film } from "lucide-react";

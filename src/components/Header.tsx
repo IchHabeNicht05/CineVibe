@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -14,7 +15,9 @@ import {
   Star, 
   ChevronRight, 
   Crown,
-  Tv
+  Tv,
+  Bookmark,
+  Home
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -604,11 +607,10 @@ export default function Header() {
             className="md:hidden w-full overflow-hidden bg-slate-950 border-t border-slate-800/60 shadow-2xl"
           >
             <nav className="flex flex-col p-4 gap-1.5 text-base font-semibold">
-              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Home size={18} className="text-slate-400" />
                 Domů
               </Link>
-              
-              {/* MOBILNÍ ODKAZY NA NOVÉ STRÁNKY */}
               <Link href="/film" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
                 <Film size={18} className="text-slate-400" />
                 Filmy
@@ -617,8 +619,8 @@ export default function Header() {
                 <Tv size={18} className="text-slate-400" />
                 Seriály
               </Link>
-
-              <Link href="/kolekce" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Link href="/kolekce" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Bookmark size={18} className="text-slate-400" />
                 Kolekce
               </Link>
               <Link href="/swipe" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-all">
