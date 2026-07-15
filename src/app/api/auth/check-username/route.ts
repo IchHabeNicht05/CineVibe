@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/auth/check-username/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";

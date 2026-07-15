@@ -156,7 +156,7 @@ export default function FilmyPage() {
                   href="/swipe"
                   className="flex items-center gap-2 bg-red-600/15 border border-red-500/30 text-red-400 font-bold px-6 py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all text-sm"
                 >
-                  <Flame size={16} className="animate-pulse" /> Najít parťáka
+                  <Flame size={16} className="animate-pulse" /> Spustit Swipe
                 </Link>
               </motion.div>
             </motion.div>

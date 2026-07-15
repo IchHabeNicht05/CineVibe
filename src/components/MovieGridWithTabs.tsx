@@ -132,7 +132,6 @@ export default function MovieGridWithTabs({ initialMovies }: MovieGridWithTabsPr
       if (selectedGenre !== "all") {
         const genreObj = GENRES.find((g) => g.id === selectedGenre);
         if (genreObj) {
-          // OPRAVA 2: Fallback (|| ""), aby měl TypeScript absolutní jistotu, že je to String
           const genreString = mediaType === "movie" ? genreObj.movie : genreObj.tv;
           const activeGenreIds = (genreString || "")
             .split(",")
