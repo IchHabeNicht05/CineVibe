@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom"; // PŘIDÁNO pro teleportaci modalu
 import { 
   Film, 
   Search, 
@@ -17,7 +18,9 @@ import {
   Crown,
   Tv,
   Bookmark,
-  Home
+  Home,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -30,10 +33,18 @@ export default function Header() {
   const pathname = usePathname();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Bezpečný stav pro renderování na klientovi (ochrana před SSR chybou)
+  const [mounted, setMounted] = useState(false);
+
   // Stavy pro UI panely
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
+  // Stavy pro smazání účtu
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
   // Stavy pro vyhledávání a našeptávač
   const [query, setQuery] = useState("");
@@ -54,12 +65,12 @@ export default function Header() {
   // Pomocná funkce pro zjištění, zda je odkaz aktivní
   const isActive = (path: string) => pathname === path;
 
-  // Skládaná přezdívka pro zobrazení (přezdívka z místnosti -> email ze Supabase -> anonym)
+  // Skládaná přezdívka pro zobrazení
   const displayUser = activeUser || supabaseUser?.email?.split("@")[0] || "Uživatel";
 
-  // Načtení relací, sledování změn a ověření Premium profilu při startu
   useEffect(() => {
-    // 1. Kontrola aktivní místnosti v localStorage
+    setMounted(true); // Aktivujeme klientský render pro Portal
+
     const checkRoomSession = () => {
       setActiveUser(localStorage.getItem("cinevibe_user"));
       setActiveRoom(localStorage.getItem("cinevibe_room"));
@@ -69,10 +80,9 @@ export default function Header() {
     window.addEventListener("storage", checkRoomSession);
     window.addEventListener("cinevibe_session_changed", checkRoomSession);
 
-    // Funkce pro bezpečné vytažení Premium statusu z DB
     const fetchPremiumStatus = async (userId: string) => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("profiles")
           .select("is_premium")
           .eq("id", userId)
@@ -89,14 +99,12 @@ export default function Header() {
       }
     };
 
-    // 2. Kontrola přihlášení při prvním načtení
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user || null;
       setSupabaseUser(user);
       if (user) fetchPremiumStatus(user.id);
     });
 
-    // 3. Sledování změn stavu přihlášení (onAuthStateChange)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user || null;
       setSupabaseUser(user);
@@ -114,7 +122,6 @@ export default function Header() {
     };
   }, []);
 
-  // Autofokus na vyhledávací input
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -122,7 +129,6 @@ export default function Header() {
     setFocusedIndex(-1);
   }, [isSearchOpen]);
 
-  // Vyhledávací našeptávač (Debounce 300ms)
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (query.trim().length < 2) {
@@ -212,6 +218,29 @@ export default function Header() {
     router.refresh();
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "SMAZAT") return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.rpc("delete_user");
+      if (error) throw error;
+
+      await supabase.auth.signOut();
+      localStorage.removeItem("cinevibe_watchlist");
+      
+      setIsDeleteModalOpen(false);
+      setDeleteConfirmText("");
+      setIsProfileOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("Chyba při mazání účtu:", err);
+      alert("Nepodařilo se smazat účet. Zkuste to prosím znovu.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const toggleSearch = () => {
     setIsSearchOpen(!isSearchOpen);
     setIsProfileOpen(false);
@@ -252,7 +281,7 @@ export default function Header() {
           </span>
         </Link>
         
-        {/* NAVIGACE (DESKTOP) */}
+        {/* NAVIGACE */}
         <nav className="hidden md:flex items-center gap-1 text-sm font-semibold text-slate-300">
           <Link 
             href="/" 
@@ -263,7 +292,6 @@ export default function Header() {
             Domů
           </Link>
           
-          {/* NOVÉ PODSTRÁNKY */}
           <Link 
             href="/filmy" 
             className={`px-3 py-2 rounded-full transition-all ${
@@ -298,38 +326,10 @@ export default function Header() {
             <Flame size={16} className="group-hover:animate-pulse" />
             Match
           </Link>
-
-          {/* PREMIUM SEKCE
-          <Link
-            href="/premium"
-            className={`group flex items-center gap-1.5 px-3.5 py-2 rounded-full transition-all ${
-              isActive("/premium") 
-                ? "text-amber-400 bg-amber-500/10" 
-                : "text-slate-300 hover:text-amber-400 hover:bg-amber-500/5"
-            }`}
-          >
-            <Crown 
-              size={16} 
-              className={`transition-all duration-300 ${
-                isPremium 
-                  ? "text-amber-400 fill-amber-400/20 animate-pulse" 
-                  : "text-slate-400 group-hover:text-amber-400"
-              }`} 
-            />
-            <span>Vibe Stats</span>
-            {!isPremium && (
-              <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20">
-                PRO
-              </span>
-            )}
-          </Link>
-          */}
         </nav>
 
-        {/* AKČNÍ TLAČÍTKA VPRAVO */}
+        {/* AKČNÍ TLAČÍTKA */}
         <div className="flex items-center gap-1 sm:gap-2 text-slate-300">
-          
-          {/* Hledání */}
           <button 
             onClick={toggleSearch}
             aria-label="Vyhledávání"
@@ -339,7 +339,6 @@ export default function Header() {
             {isSearchOpen ? <X size={18} /> : <Search size={18} />}
           </button>
 
-          {/* Profil a stav místnosti */}
           <div className="relative">
             <button 
               onClick={toggleProfile} 
@@ -378,12 +377,25 @@ export default function Header() {
                           )}
                         </div>
                         <p className="text-sm font-bold text-slate-200 truncate">{supabaseUser.email}</p>
-                        <button
-                          onClick={handleSupabaseSignOut}
-                          className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-300 transition-colors pt-1 cursor-pointer"
-                        >
-                          <LogOut size={12} /> Odhlásit se z webu
-                        </button>
+                        
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <button
+                            onClick={handleSupabaseSignOut}
+                            className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <LogOut size={12} /> Odhlásit se z webu
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              setIsDeleteModalOpen(true);
+                              setIsProfileOpen(false);
+                            }}
+                            className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-400 transition-colors pt-2 border-t border-slate-800/60 mt-1 cursor-pointer"
+                          >
+                            <Trash2 size={12} /> Smazat můj účet
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="py-1">
@@ -447,7 +459,6 @@ export default function Header() {
             </AnimatePresence>
           </div>
 
-          {/* Hamburger (mobil) */}
           <button 
             onClick={toggleMobileMenu}
             aria-label="Menu"
@@ -491,7 +502,6 @@ export default function Header() {
                 )}
               </form>
 
-              {/* Box s našepkávanými výsledky */}
               <AnimatePresence>
                 {(isFetchingSuggestions || suggestions.length > 0) && (
                   <motion.div
@@ -587,7 +597,6 @@ export default function Header() {
                         />
                       </button>
                     )}
-
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -608,54 +617,45 @@ export default function Header() {
           >
             <nav className="flex flex-col p-4 gap-1.5 text-base font-semibold">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
-              <Home size={18} className="text-slate-400" />
+                <Home size={18} className="text-slate-400" />
                 Domů
               </Link>
-              <Link href="/film" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Link href="/filmy" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
                 <Film size={18} className="text-slate-400" />
                 Filmy
               </Link>
-              <Link href="/tv" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
+              <Link href="/serialy" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
                 <Tv size={18} className="text-slate-400" />
                 Seriály
               </Link>
               <Link href="/kolekce" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-xl hover:bg-slate-900 text-slate-300 hover:text-white transition-all">
-              <Bookmark size={18} className="text-slate-400" />
+                <Bookmark size={18} className="text-slate-400" />
                 Kolekce
               </Link>
               <Link href="/swipe" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-all">
                 <Flame size={18} className="animate-pulse" />
                 Match (Swipe)
               </Link>
-
-              {/* Premium v mobilním zobrazení
-              <Link 
-                href="/premium" 
-                onClick={() => setIsMobileMenuOpen(false)} 
-                className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-amber-500/10 text-slate-300 hover:text-amber-400 transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <Crown size={18} className={isPremium ? "text-amber-400 fill-amber-400/10 animate-pulse" : "text-slate-400"} />
-                  <span>Vibe Stats</span>
-                </div>
-                {!isPremium && (
-                  <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
-                    PRO
-                  </span>
-                )}
-              </Link>
-              */}
               
               <div className="h-px bg-slate-800/60 my-2" />
               
               {supabaseUser ? (
-                <button
-                  onClick={() => { handleSupabaseSignOut(); setIsMobileMenuOpen(false); }}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-left text-slate-400 hover:text-red-400 hover:bg-red-500/5 font-medium transition-all"
-                >
-                  <LogOut size={18} />
-                  Odhlásit ({supabaseUser.email.split("@")[0]})
-                </button>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => { handleSupabaseSignOut(); setIsMobileMenuOpen(false); }}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl text-left text-slate-400 hover:text-white hover:bg-slate-900 font-medium transition-all"
+                  >
+                    <LogOut size={18} />
+                    Odhlásit ({supabaseUser.email.split("@")[0]})
+                  </button>
+                  <button
+                    onClick={() => { setIsDeleteModalOpen(true); setIsMobileMenuOpen(false); }}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl text-left text-red-500 hover:text-red-400 hover:bg-red-500/5 font-bold transition-all"
+                  >
+                    <Trash2 size={18} />
+                    Smazat můj účet
+                  </button>
+                </div>
               ) : (
                 <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-900 font-medium transition-all">
                   <LogIn size={18} />
@@ -666,6 +666,91 @@ export default function Header() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* --- TELEPORTOVANÝ POTVRZOVACÍ MODAL (Mimo strukturu headeru) --- */}
+      {mounted && isDeleteModalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          
+          {/* Tmavé pozadí - nyní zakryje doopravdy celý web */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              if (!isDeleting) {
+                setIsDeleteModalOpen(false);
+                setDeleteConfirmText("");
+              }
+            }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Karta modalu - nyní bude perfektně na středu obrazovky */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", duration: 0.3 }}
+            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl text-white z-10"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-white">Opravdu smazat účet?</h3>
+                <p className="mt-1 text-sm text-slate-400 leading-relaxed">
+                  Tato akce je <strong>zcela nevratná</strong>. Přijdete o svůj watchlist, vaše založené kolekce, veškeré komentáře a herní statistiky.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                  Pro potvrzení napište slovo <span className="text-red-500">SMAZAT</span>
+                </label>
+                <input
+                  type="text"
+                  disabled={isDeleting}
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                  placeholder="Sem napište SMAZAT"
+                  className="w-full h-11 px-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-red-500/50 transition-all font-bold uppercase tracking-wider"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setIsDeleteModalOpen(false);
+                    setDeleteConfirmText("");
+                  }}
+                  className="flex-1 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  Zrušit
+                </button>
+                <button
+                  disabled={deleteConfirmText !== "SMAZAT" || isDeleting}
+                  onClick={handleDeleteAccount}
+                  className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/10 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Mažu...
+                    </>
+                  ) : (
+                    "Trvale smazat"
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
 
     </header>
   );

@@ -105,6 +105,11 @@ export default function FilmyPage() {
     setPage(1);
   };
 
+  // !!! DEDUPLIKACE: Bezpečné odstranění filmů se stejným ID před samotným vykreslením !!!
+  const uniqueMovies = movies.filter(
+    (movie, index, self) => self.findIndex((m) => m.id === movie.id) === index
+  );
+
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-16 overflow-x-hidden">
       {/* HERO BANNER (Populární film týdne) */}
@@ -140,8 +145,9 @@ export default function FilmyPage() {
                 {heroMovie.overview}
               </motion.p>
               <motion.div variants={heroItemVariants} className="flex flex-wrap items-center gap-3">
+                {/* Opraveno na správnou počeštělou URL: /filmy/ instead of /film/ */}
                 <Link
-                  href={`/film/${heroMovie.id}`}
+                  href={`/filmy/${heroMovie.id}`}
                   className="flex items-center gap-2 bg-white text-slate-950 font-bold px-6 py-3 rounded-xl hover:bg-slate-200 active:scale-95 transition-all text-sm"
                 >
                   <Play size={16} fill="currentColor" /> Detail filmu
@@ -242,13 +248,14 @@ export default function FilmyPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              {movies.length === 0 ? (
+              {uniqueMovies.length === 0 ? (
                 <div className="text-center py-20 bg-slate-900/20 border border-slate-900 rounded-2xl">
                   <p className="text-slate-400 font-medium text-sm">Žádné filmy neodpovídají vybraným filtrům.</p>
                 </div>
               ) : (
                 <motion.div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-                  {movies.map((movie, index) => (
+                  {/* Používáme zabezpečené jedinečné pole uniqueMovies místo původního movies */}
+                  {uniqueMovies.map((movie, index) => (
                     <motion.div
                       key={movie.id}
                       initial={{ opacity: 0, y: 15 }}
@@ -267,7 +274,7 @@ export default function FilmyPage() {
               )}
 
               {/* TLAČÍTKO NAČÍST DALŠÍ */}
-              {movies.length > 0 && (
+              {uniqueMovies.length > 0 && (
                 <div className="flex justify-center mt-12">
                   <button
                     onClick={() => setPage((p) => p + 1)}
