@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -17,6 +17,7 @@ import {
   AlertCircle 
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { 
   ResponsiveContainer, 
@@ -60,14 +61,18 @@ interface GenreStat {
   value: number;
 }
 
-export default function PremiumDashboard() {
+// Vnitřní komponenta s veškerou logikou (aby fungoval Suspense a useSearchParams)
+function PremiumDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   
-  // Prémiový stav (pro demo účely lze kliknutím aktivovat)
+  // Prémiový stav (reálný + možnost demo přepnutí)
   const [isPremium, setIsPremium] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // Statistiky
   const [room, setRoom] = useState<string | null>(null);
@@ -83,17 +88,51 @@ export default function PremiumDashboard() {
     setMounted(true);
   }, []);
 
-  // 1. Ověření uživatele
+  // 1. Ověření uživatele a stažení jeho REÁLNÉHO premium statusu z databáze
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+
+        // Dotaz do tabulky profiles na stav is_premium
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("is_premium")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!error && profile) {
+          setIsPremium(profile.is_premium);
+        }
+      } else {
+        setUser(null);
+        setIsPremium(false);
+      }
+      // Vypneme loading až ve chvíli, kdy od Supabase dostaneme jasné vyjádření o stavu přihlášení
       setAuthLoading(false);
+    });
+
+    // Při opuštění komponenty posluchač uklidíme
+    return () => {
+      subscription.unsubscribe();
     };
-    checkUser();
   }, []);
 
-  // 2. Načtení aktivní místnosti z localStorage a stažení statistik
+  // 2. Zachycení návratu ze Stripe brány (?success=true)
+  useEffect(() => {
+    if (searchParams && searchParams.get("success") === "true") {
+      setShowSuccessToast(true);
+      setIsPremium(true); // Okamžitě uživateli vizuálně odemkneme premium, než se synchronizuje DB
+      
+      // Vyčistíme URL parametry z adresního řádku pro čistý vzhled
+      router.replace("/premium");
+
+      const timer = setTimeout(() => setShowSuccessToast(false), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, router]);
+
+  // 3. Načtení aktivní místnosti z localStorage a stažení statistik
   useEffect(() => {
     if (!user) return;
     const savedRoom = localStorage.getItem("cinevibe_room");
@@ -104,7 +143,7 @@ export default function PremiumDashboard() {
     }
   }, [user]);
 
-  // 3. Výpočet statistik na základě dat ze Supabase
+  // 4. Výpočet statistik na základě dat ze Supabase
   const calculateStats = async (roomCode: string) => {
     setLoadingStats(true);
     
@@ -131,7 +170,6 @@ export default function PremiumDashboard() {
     swipes.forEach(swipe => {
       if (!movieGroups[swipe.movie_id]) {
         movieGroups[swipe.movie_id] = {
-          // Ošetření jsonb pole žánrů
           genres: Array.isArray(swipe.genre_ids) ? swipe.genre_ids : [],
           swipes: {}
         };
@@ -146,14 +184,12 @@ export default function PremiumDashboard() {
     Object.values(movieGroups).forEach(group => {
       const voters = Object.keys(group.swipes);
       
-      // Výpočet probíhá pouze u filmů, kde hlasovali alespoň 2 lidé
       if (voters.length >= 2) {
         totalSharedSwipes++;
         
         const isMutualLike = voters.every(user => group.swipes[user] === true);
         if (isMutualLike) {
           sharedLikes++;
-          // Spočítáme žánry u úspěšných shod
           group.genres.forEach(genreId => {
             const genreName = GENRES_MAP[genreId];
             if (genreName) {
@@ -166,11 +202,9 @@ export default function PremiumDashboard() {
 
     setMutualMatches(sharedLikes);
 
-    // Výpočet Vibe Score (procento společných shod ku společně ohodnoceným filmům)
     const score = totalSharedSwipes > 0 ? Math.round((sharedLikes / totalSharedSwipes) * 100) : 0;
     setVibeScore(score);
 
-    // Příprava dat pro graf (top 5 žánrů)
     const formattedGenres = Object.entries(genreCounter).map(([name, value]) => ({
       name,
       value
@@ -180,13 +214,46 @@ export default function PremiumDashboard() {
     setLoadingStats(false);
   };
 
-  // Simulace nákupu Premium
-  const handleUnlockDemo = () => {
+  // REÁLNÉ spuštění Stripe Checkout platby
+  const handleCheckout = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
     setUnlocking(true);
-    setTimeout(() => {
-      setIsPremium(true);
+
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          userEmail: user.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        // Přesměrování na platební bránu Stripe
+        window.location.href = data.url;
+      } else {
+        alert("Nepodařilo se vygenerovat platební bránu. Zkuste to prosím znovu.");
+        setUnlocking(false);
+      }
+    } catch (error) {
+      console.error("Chyba při komunikaci s API:", error);
+      alert("Něco se nepovedlo. Zkontrolujte připojení k internetu.");
       setUnlocking(false);
-    }, 1500);
+    }
+  };
+
+  // Pomocný simulátor pro rychlé lokální testování designu
+  const handleUnlockDemo = () => {
+    setIsPremium(true);
   };
 
   if (authLoading || !mounted) {
@@ -221,7 +288,30 @@ export default function PremiumDashboard() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-slate-950 text-white pb-16">
+    <main className="min-h-[calc(100vh-4rem)] bg-slate-950 text-white pb-16 relative">
+      
+      {/* Toast upozornění na úspěšnou platbu */}
+      <AnimatePresence>
+        {showSuccessToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-6 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4"
+          >
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-950/90 p-4 text-emerald-200 shadow-2xl backdrop-blur-md">
+              <div className="rounded-full bg-emerald-500/20 p-2 text-emerald-400">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold">Platba byla úspěšná!</h4>
+                <p className="text-xs text-emerald-300/80">Vítej v CineVibe Premium. Tvůj účet byl povýšen.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* VRCHNÍ NAVIGAČNÍ PANEL */}
       <div className="mx-auto max-w-7xl px-6 pt-8">
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition-colors">
@@ -290,27 +380,33 @@ export default function PremiumDashboard() {
                 </div>
 
                 {/* Platební karta */}
-                <div className="md:col-span-2 bg-slate-950/80 border border-white/[0.06] rounded-2xl p-6 text-center shadow-xl">
+                <div className="md:col-span-2 bg-slate-950/80 border border-white/[0.06] rounded-2xl p-6 text-center shadow-xl flex flex-col items-center justify-center">
                   <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-400/10 px-3 py-1 rounded-full">Jednorázový nákup</span>
                   <div className="my-6">
                     <span className="text-4xl font-black">79 Kč</span>
                     <span className="text-xs text-slate-500 block mt-1">žádné předplatné, navždy tvoje</span>
                   </div>
 
+                  {/* Reálná Stripe checkout platba */}
                   <button
-                    onClick={handleUnlockDemo}
+                    onClick={handleCheckout}
                     disabled={unlocking}
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 p-4 font-bold text-slate-950 transition-all duration-300 hover:from-amber-400 hover:to-yellow-400 active:scale-[0.98] shadow-lg shadow-amber-500/20"
                   >
                     {unlocking ? (
                       <Loader2 size={18} className="animate-spin text-slate-950" />
                     ) : (
-                      <>Odemknout Premium (Demo)</>
+                      <>Odemknout Premium</>
                     )}
                   </button>
-                  <p className="text-[10px] text-slate-500 mt-3">
-                    Kliknutím zdarma otestuješ celé rozhraní a grafy.
-                  </p>
+                  
+                  {/* Skryté zadní vrátka pro ladění vzhledu */}
+                  <button
+                    onClick={handleUnlockDemo}
+                    className="text-[11px] text-slate-500 hover:text-slate-400 mt-4 underline transition-all"
+                  >
+                    Chci jen otestovat vzhled (Demo bez placení)
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -473,5 +569,18 @@ export default function PremiumDashboard() {
 
       </div>
     </main>
+  );
+}
+
+// 5. Hlavní obalová komponenta se Suspense (kritické pro správný build na Vercelu)
+export default function PremiumPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-slate-950">
+        <Loader2 className="h-10 w-10 animate-spin text-red-500" />
+      </div>
+    }>
+      <PremiumDashboard />
+    </Suspense>
   );
 }
