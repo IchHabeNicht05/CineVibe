@@ -100,7 +100,7 @@ export default function Hero({ movies = [] }: HeroProps) {
           variants={itemVariants}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold uppercase tracking-widest mb-4"
         >
-          🍿 Tvůj filmový kompas
+          Tvůj filmový kompas
         </motion.div>
 
         {/* Název projektu */}

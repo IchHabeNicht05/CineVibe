@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/app/tv/[id]/page.tsx
 import { notFound } from "next/navigation";
 import { Star, Calendar, MonitorPlay, Users, Play, Info, Tv, Globe, Building2 } from "lucide-react";
-// Importujeme existující animační wrappery z detailu filmu
 import { AnimateFadeIn, StaggerContainer, StaggerItem } from "../../filmy/[id]/AnimationWrappers";
 import Discussion from "@/components/Discussion";
+import WatchProviders from "@/components/WatchProviders"; // NAŠÍ NOVÝ IMPORT
+import { Suspense } from "react"; // NAŠÍ NOVÝ IMPORT
 
 async function getTvShowDetails(id: string) {
   if (!process.env.TMDB_API_KEY) {
@@ -22,36 +22,13 @@ async function getTvShowDetails(id: string) {
   }
 }
 
-async function getWatchProviders(id: string) {
-  if (!process.env.TMDB_API_KEY) return null;
-  const res = await fetch(
-    `https://api.themoviedb.org/3/tv/${id}/watch/providers?api_key=${process.env.TMDB_API_KEY}`,
-    { next: { revalidate: 3600 } }
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.results?.CZ || null;
-}
-
-function getLocalProviderLogo(providerId: number): string | null {
-  switch (providerId) {
-    case 8: return "/logos/netflix.webp"; 
-    case 1899: case 384: return "/logos/hbo.png";
-    case 337: return "/logos/disney.webp";
-    case 1773: return "/logos/skyshowtime.png";
-    case 119: return "/logos/prime.webp";
-    case 350: return "/logos/apple.jpg";
-    default: return null;
-  }
-}
+// ODEBRALI JSME: getWatchProviders a getLocalProviderLogo odsud!
 
 export default async function TvShowPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   
-  const [show, providers] = await Promise.all([
-    getTvShowDetails(resolvedParams.id),
-    getWatchProviders(resolvedParams.id)
-  ]);
+  // NAČÍTÁME POUZE DETAIL SERIÁLU
+  const show = await getTvShowDetails(resolvedParams.id);
 
   if (show?.error) {
     return (
@@ -68,7 +45,6 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
     notFound();
   }
 
-  const streamingServices = providers?.flatrate || [];
   const trailer = show.videos?.results?.find(
     (vid: any) => vid.site === "YouTube" && vid.type === "Trailer"
   );
@@ -76,7 +52,7 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
   return (
     <div className="min-h-screen bg-slate-950 text-slate-300 pb-20 overflow-x-hidden">
       
-      {/* --- HERO SEKCE S BACKDROP OBRÁZKEM (Animace a object-top) --- */}
+      {/* ... (Celá horní hero a poster část zůstává beze změny) ... */}
       <div className="relative w-full h-[40vh] md:h-[50vh] bg-slate-900 overflow-hidden">
         {show.backdrop_path ? (
           <AnimateFadeIn type="image" className="absolute inset-0 w-full h-full">
@@ -92,11 +68,9 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
-      {/* --- HLAVNÍ OBSAH (Postupné načítání prvků) --- */}
       <div className="max-w-6xl mx-auto px-6 relative -mt-32 md:-mt-48 z-10">
         <div className="flex flex-col md:flex-row gap-8 md:gap-12">
           
-          {/* Levý sloupec: Plakát */}
           <AnimateFadeIn delay={0.2} className="w-48 md:w-1/3 flex-shrink-0 mx-auto md:mx-0">
             {show.poster_path ? (
               <img
@@ -111,16 +85,13 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
             )}
           </AnimateFadeIn>
           
-          {/* Pravý sloupec: Informace s kaskádovým efektem */}
           <StaggerContainer className="w-full md:w-2/3 flex flex-col justify-end pt-4 md:pt-16">
-            
             <StaggerItem>
               <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight drop-shadow-md">
                 {show.name}
               </h1>
             </StaggerItem>
             
-            {/* Rychlá fakta */}
             <StaggerItem>
               <div className="flex flex-wrap items-center gap-4 text-sm font-medium mb-6">
                 {show.first_air_date && (
@@ -149,7 +120,6 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
               </div>
             </StaggerItem>
 
-            {/* Žánry */}
             {show.genres && show.genres.length > 0 && (
               <StaggerItem>
                 <div className="flex flex-wrap gap-2 mb-6">
@@ -162,7 +132,6 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
               </StaggerItem>
             )}
 
-            {/* Popis */}
             <StaggerItem>
               <div className="mb-8">
                 <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
@@ -175,7 +144,6 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
               </div>
             </StaggerItem>
 
-            {/* Akční tlačítko (Trailer) */}
             {trailer && (
               <StaggerItem>
                 <div className="mb-10">
@@ -191,14 +159,13 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
                 </div>
               </StaggerItem>
             )}
-
           </StaggerContainer>
         </div>
 
         {/* --- SPODNÍ SEKCE: KDE SLEDOVAT A DETAILY --- */}
         <AnimateFadeIn delay={0.4} className="mt-12 grid grid-cols-1 gap-8 border-t border-slate-800/60 pt-10 md:grid-cols-2">
           
-          {/* LEVÁ STRANA: Kde sledovat */}
+          {/* LEVÁ STRANA: Kde sledovat s naším novým komponentem (type="tv") */}
           <div>
             <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <MonitorPlay size={24} className="text-red-500" />
@@ -206,40 +173,15 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
               <span className="text-xs font-normal text-slate-500 ml-2">(v předplatném)</span>
             </h3>
             
-            {streamingServices.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {streamingServices.map((service: any) => {
-                  const localLogo = getLocalProviderLogo(service.provider_id);
-                  const logoSrc = localLogo || `https://image.tmdb.org/t/p/w154${service.logo_path}`;
-                  
-                  return (
-                    <div 
-                      key={service.provider_id} 
-                      className="group relative flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900 p-3 pr-5 transition-all duration-300 hover:border-slate-700 hover:bg-slate-800"
-                    >
-                      <div className="relative h-12 w-12 overflow-hidden rounded-lg shadow-md">
-                        <img 
-                          src={logoSrc} 
-                          alt={service.provider_name}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white">{service.provider_name}</span>
-                        <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
-                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                          Dostupné ihned
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* VOLÁNÍ SKELETONU A KOMPONENTY PRO TV SERIÁLY */}
+            <Suspense fallback={
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-pulse">
+                <div className="h-20 bg-slate-900 rounded-xl border border-slate-800/40" />
+                <div className="h-20 bg-slate-900 rounded-xl border border-slate-800/40" />
               </div>
-            ) : (
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-slate-400 text-sm">
-                Tento seriál momentálně v ČR na žádné streamovací platformě v rámci předplatného neběží.
-              </div>
-            )}
+            }>
+              <WatchProviders id={resolvedParams.id} type="tv" />
+            </Suspense>
           </div>
 
           {/* PRAVÁ STRANA: Podrobné detaily */}
@@ -321,7 +263,7 @@ export default async function TvShowPage({ params }: { params: Promise<{ id: str
           </AnimateFadeIn>
         )}
 
-        {/* --- SEKCE: NOVÁ FULL-WIDTH DISKUZE PRO SERIÁLY --- */}
+        {/* --- SEKCE: DISKUZE --- */}
         <div className="mt-16">
           <Discussion mediaId={resolvedParams.id} mediaType="tv" />
         </div>

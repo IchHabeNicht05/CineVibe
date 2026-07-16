@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import PWARegister from "@/components/PWARegister";
 import Footer from "@/components/Footer";
+import WatchlistSyncListener from "@/components/WatchlistSyncListener";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,11 +42,13 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className={inter.className}>
+        <WatchlistSyncListener />
         {/* Registrace Service Workera pro PWA na pozadí */}
         <PWARegister />
         <Header />
         {children}
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
