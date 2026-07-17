@@ -72,7 +72,8 @@ function PremiumDashboard() {
   // Prémiový stav (reálný + možnost demo přepnutí)
   const [isPremium, setIsPremium] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);  
+  const isSuccess = searchParams.get("success") === "true";
 
   // Statistiky
   const [room, setRoom] = useState<string | null>(null);
@@ -87,6 +88,16 @@ function PremiumDashboard() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+  if (isSuccess) {
+    // 1. Tady se ti spouští ten tvůj zelený toast "Platba byla úspěšná!"
+    
+    // 2. OKAMŽITĚ poté vymažeme "?success=true" z URL adresy:
+    const cleanUrl = window.location.pathname; // Získá čistou cestu, např. "/premium"
+    window.history.replaceState(null, "", cleanUrl);
+  }
+}, [isSuccess]);
 
   // 1. Ověření uživatele a stažení jeho REÁLNÉHO premium statusu z databáze
   useEffect(() => {
