@@ -17,12 +17,11 @@ interface SwipeCardProps {
 
 // --- SAMOSTATNÁ KOMPONENTA KARTY S VLASTNÍ FYZIKOU ---
 function SwipeCard({ movie, exitX, onSwipe, ...props }: SwipeCardProps & any) {
-  // Každá karta má nyní své izolované Motion Values
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
 
   const handleDragEnd = (_event: any, info: any) => {
-    const swipeThreshold = 100; // Dráha v pixelech pro detekci swipu
+    const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
       onSwipe(true);
     } else if (info.offset.x < -swipeThreshold) {
@@ -32,12 +31,12 @@ function SwipeCard({ movie, exitX, onSwipe, ...props }: SwipeCardProps & any) {
 
   return (
     <motion.div
-      {...props} // Klíčové: Předá interní animační stavy z AnimatePresence (pro plynulý exit)
+      {...props}
       style={{ x, rotate }}
       drag="x"
-      dragConstraints={{ left: 0, right: 0 }} // Vrací kartu na střed
+      dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
-      dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }} // Rychlé, gumové vrácení zpět bez zasekávání
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
       onDragEnd={handleDragEnd}
       custom={exitX}
       variants={{
@@ -95,14 +94,16 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
   const [roomError, setRoomError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Stavy pro swipování a animace
+  // Stavy pro swipování, filtraci a animace
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayMovies, setDisplayMovies] = useState<Movie[]>([]); // 👑 NOVÉ: Filtrované pole pro zobrazení
+  const [contentLoading, setContentLoading] = useState(false);     // 👑 NOVÉ: Loading stav během čištění duplicit
   const [matchedMovie, setMatchedMovie] = useState<Movie | null>(null);
   
-  // Směr odletu karty: kladné číslo = doprava, záporné = doleva
   const [exitX, setExitX] = useState(0);
 
-  const currentMovie = movies[currentIndex];
+  // 👑 ZMĚNA: Čteme z odfiltrovaného pole displayMovies místo surových movies propů
+  const currentMovie = displayMovies[currentIndex];
 
   // Efekt pro zjištění přihlášeného uživatele
   useEffect(() => {
@@ -131,6 +132,43 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
       }
     }
   }, [user]);
+
+  // 👑 NOVÉ: Efekt pro odfiltrování již odswipovaného obsahu (filmů i seriálů) v dané místnosti
+  useEffect(() => {
+    const filterAlreadySwiped = async () => {
+      if (!room || !user || !isJoined) {
+        setDisplayMovies([]);
+        return;
+      }
+
+      setContentLoading(true);
+      const userName = getUserDisplayName();
+
+      // Vytáhneme z DB všechny swipy, které už tento uživatel v této místnosti udělal
+      const { data: swipedRecords, error } = await supabase
+        .from("movie_swipes")
+        .select("movie_id")
+        .eq("room_id", room)
+        .eq("user_name", userName);
+
+      if (!error && swipedRecords) {
+        // Vytvoříme si rychlou sadu (Set) již ohodnocených ID pro bleskové vyhledávání
+        const swipedIds = new Set(swipedRecords.map((r) => r.movie_id));
+        
+        // Vyčistíme balíček – ponecháme jen ty, které uživatel ještě v této místnosti neviděl
+        const freshContent = movies.filter((movie) => !swipedIds.has(movie.id));
+        setDisplayMovies(freshContent);
+      } else {
+        // Záložní plán pro případ výpadku DB
+        setDisplayMovies(movies);
+      }
+
+      setCurrentIndex(0); // Vždy začínáme od začátku vyčištěného pole
+      setContentLoading(false);
+    };
+
+    filterAlreadySwiped();
+  }, [room, isJoined, user, movies]);
 
   // Generátor kódu
   const generateRoomCode = () => {
@@ -166,6 +204,11 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     }
 
     if (success) {
+      await supabase
+        .from("profiles")
+        .update({ last_room_id: newCode })
+        .eq("id", user.id);
+
       localStorage.setItem("cinevibe_room", newCode);
       window.dispatchEvent(new Event("cinevibe_session_changed")); 
       setRoom(newCode);
@@ -197,6 +240,11 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
       return;
     }
 
+    await supabase
+      .from("profiles")
+      .update({ last_room_id: formattedCode })
+      .eq("id", user.id);
+
     localStorage.setItem("cinevibe_room", formattedCode);
     window.dispatchEvent(new Event("cinevibe_session_changed")); 
     setRoom(formattedCode);
@@ -211,6 +259,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     setRoomInput("");
     setIsJoined(false);
     setCurrentIndex(0);
+    setDisplayMovies([]);
     setMatchedMovie(null);
   };
 
@@ -231,7 +280,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     );
   };
 
-  // Zápis swipu a kontrolu shody
+  // Zápis swipu a kontrola shody
   const handleSwipe = async (liked: boolean) => {
     if (!currentMovie || !user) return;
 
@@ -245,7 +294,7 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
         movie_title: currentMovie.title,
         movie_poster: currentMovie.poster_path,
         is_liked: liked,
-        genre_ids: currentMovie.genre_ids, // <--- TENTO ŘÁDEK JSME PŘIDALI
+        genre_ids: currentMovie.genre_ids,
       },
     ]);
 
@@ -271,13 +320,13 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
     setCurrentIndex((prev) => prev + 1);
   };
 
-  // Sjednocená funkce pro nastavení směru animace odletu a provede swipe
   const performSwipe = (liked: boolean) => {
     setExitX(liked ? 350 : -350);
     handleSwipe(liked);
   };
 
-  if (authLoading) {
+  // 👑 ZMĚNA: Čekáme také na dokoušení a vyčištění filmů
+  if (authLoading || contentLoading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-slate-950">
         <Loader2 className="h-10 w-10 animate-spin text-red-500" />
@@ -393,7 +442,8 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
   }
 
   // --- OBRAZOVKA 2: Všechno odswipováno ---
-  if (currentIndex >= movies.length || !currentMovie) {
+  // 👑 ZMĚNA: Počítáme konec vůči displayMovies.length
+  if (currentIndex >= displayMovies.length || !currentMovie) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col items-center justify-center p-6 text-center bg-slate-950 text-white">
         <div className="relative mb-6">
@@ -402,9 +452,9 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
             <Film size={28} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold">Filmy ti došly!</h2>
+        <h2 className="text-2xl font-bold">Obsah ti došel!</h2>
         <p className="text-slate-400 mt-2 max-w-sm mb-8">
-          Projel jsi celý balíček. Počkej, až tvůj partner dovybere, nebo zkuste založit novou místnost.
+          Projel jsi všechny filmy a seriály v tomto balíčku. Počkej na partnera, nebo zkus založit novou místnost.
         </p>
         <button
           onClick={handleLeave}
@@ -459,7 +509,6 @@ export default function SwipeSession({ movies }: SwipeSessionProps) {
       {/* Kontejner s kartami */}
       <div className="relative w-full max-w-[340px] aspect-[2/3] sm:max-w-[360px]">
         <AnimatePresence custom={exitX} mode="popLayout">
-          {/* Volání izolované komponenty SwipeCard */}
           <SwipeCard
             key={currentMovie.id}
             movie={currentMovie}

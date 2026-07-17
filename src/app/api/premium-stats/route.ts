@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js"; // Přidáno pro přímou práci s tokenem
 import { cookies } from "next/headers";
 
 const GENRES_MAP: { [key: number]: string } = {
@@ -17,44 +18,67 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Chybí kód místnosti" }, { status: 400 });
   }
 
-  // Podpora pro synchronní (Next.js 14) i asynchronní (Next.js 15+) cookies
-  const cookieStore = cookies();
-  const resolvedCookies = cookieStore instanceof Promise ? await cookieStore : cookieStore;
+  // 1. Zkusíme vytáhnout token z Authorization hlavičky
+  const authHeader = request.headers.get("Authorization");
+  const token = authHeader?.split(" ")[1];
 
-  // Vytvoření moderního serverového Supabase klienta pomocí @supabase/ssr
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return resolvedCookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          try {
-            resolvedCookies.set({ name, value, ...options });
-          } catch {
-            // Ignorujeme chybu v situacích, kdy nelze cookies modifikovat
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            resolvedCookies.delete({ name, ...options });
-          } catch {
-            // Ignorujeme chybu
-          }
-        },
-      },
-    }
-  );
+  let supabase;
 
-  // 1. Ověření přihlášení uživatele (bezpečné getUser() na serveru)
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (token) {
+    // A) Pokud token existuje, vytvoříme klienta, který ho přibalí do každého DB dotazu (klíčové pro RLS)
+    supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      }
+    );
+  } else {
+    // B) Fallback na původní cookie řešení, pokud hlavička chybí
+    const cookieStore = cookies();
+    const resolvedCookies = cookieStore instanceof Promise ? await cookieStore : cookieStore;
+
+    supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return resolvedCookies.get(name)?.value;
+          },
+          set(name: string, value: string, options: any) {
+            try {
+              resolvedCookies.set({ name, value, ...options });
+            } catch {}
+          },
+          remove(name: string, options: any) {
+            try {
+              resolvedCookies.delete({ name, ...options });
+            } catch {}
+          },
+        },
+      }
+    );
+  }
+
+  // 2. Ověření přihlášení uživatele (podpora pro token i session)
+  const { data: { user }, error: authError } = token 
+    ? await supabase.auth.getUser(token) 
+    : await supabase.auth.getUser();
+
   if (authError || !user) {
     return NextResponse.json({ error: "Neautorizovaný přístup" }, { status: 401 });
   }
 
-  // 2. Ověření Premium statusu přímo v DB
+  // 3. Ověření Premium statusu přímo v DB
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_premium")
@@ -65,7 +89,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Pro zobrazení statistik je vyžadováno Premium" }, { status: 403 });
   }
 
-  // 3. Načtení dat ze Supabase na serveru
+  // 4. Načtení dat ze Supabase na serveru
   const { data: swipes, error } = await supabase
     .from("movie_swipes")
     .select("movie_id, user_name, is_liked, genre_ids")
@@ -75,7 +99,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Chyba při načítání dat" }, { status: 500 });
   }
 
-  // 4. Výpočet statistik
+  // 5. Výpočet statistik (zůstává beze změny)
   const uniqueUsers = Array.from(new Set(swipes.map(s => s.user_name)));
   const usersCount = uniqueUsers.length;
   const totalSwiped = swipes.length;
