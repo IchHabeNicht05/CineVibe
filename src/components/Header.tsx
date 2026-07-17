@@ -317,6 +317,18 @@ export default function Header() {
           >
             Kolekce
           </Link>
+
+          {/* NOVÁ SEKCE PREMIUM V DESKTOP MENU */}
+          <Link 
+            href="/premium" 
+            className={`group flex items-center gap-1 px-3.5 py-2 rounded-full transition-all ${
+              isActive("/premium") ? "text-amber-400 bg-amber-400/15 font-bold" : "text-amber-500/90 hover:text-amber-400 hover:bg-amber-400/10"
+            }`}
+          >
+            <Crown size={15} className={`transition-transform duration-300 ${isActive("/premium") ? "scale-110 fill-amber-400" : "group-hover:scale-110"}`} />
+            Premium
+          </Link>
+
           <Link 
             href="/swipe" 
             className={`group flex items-center gap-1.5 px-3.5 py-2 rounded-full transition-all ${
@@ -370,9 +382,15 @@ export default function Header() {
                             <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Přihlášený účet</span>
                           </div>
-                          {isPremium && (
+                          
+                          {/* DYNAMICKÝ UKAZATEL PREMIUM / FREE */}
+                          {isPremium ? (
                             <span className="flex items-center gap-1 text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-500/20">
                               <Crown size={10} className="fill-amber-400" /> PREMIUM
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-full border border-slate-700/30">
+                              FREE PLAN
                             </span>
                           )}
                         </div>
@@ -632,12 +650,44 @@ export default function Header() {
                 <Bookmark size={18} className="text-slate-400" />
                 Kolekce
               </Link>
+
+              {/* NOVÝ ODKAZ PREMIUM V MOBILNÍM SEZNAMU */}
+              <Link 
+                href="/premium" 
+                onClick={() => setIsMobileMenuOpen(false)} 
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl transition-all ${
+                  isActive("/premium") ? "bg-amber-500/10 text-amber-400 font-bold" : "hover:bg-slate-900 text-slate-300 hover:text-white"
+                }`}
+              >
+                <Crown size={18} className={isActive("/premium") ? "text-amber-400 fill-amber-400" : "text-slate-400"} />
+                Premium
+              </Link>
+
               <Link href="/swipe" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-all">
                 <Flame size={18} className="animate-pulse" />
                 Match (Swipe)
               </Link>
               
               <div className="h-px bg-slate-800/60 my-2" />
+
+              {/* MOBILNÍ BANER S PROFILOVÝMI INFORMACEMI & PREMIUM STATUSEM */}
+              {supabaseUser && (
+                <div className="px-4 py-3 flex items-center justify-between bg-slate-900/40 rounded-xl border border-slate-800/40 mb-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Můj účet</p>
+                    <p className="text-xs font-bold text-slate-300 truncate max-w-[140px]">{supabaseUser.email}</p>
+                  </div>
+                  {isPremium ? (
+                    <span className="flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                      <Crown size={10} className="fill-amber-400" /> PREMIUM
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-black text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-full border border-slate-700/30">
+                      FREE PLAN
+                    </span>
+                  )}
+                </div>
+              )}
               
               {supabaseUser ? (
                 <div className="flex flex-col gap-1">
@@ -646,7 +696,7 @@ export default function Header() {
                     className="flex items-center gap-2 px-4 py-3 rounded-xl text-left text-slate-400 hover:text-white hover:bg-slate-900 font-medium transition-all"
                   >
                     <LogOut size={18} />
-                    Odhlásit ({supabaseUser.email.split("@")[0]})
+                    Odhlásit se z webu
                   </button>
                   <button
                     onClick={() => { setIsDeleteModalOpen(true); setIsMobileMenuOpen(false); }}
